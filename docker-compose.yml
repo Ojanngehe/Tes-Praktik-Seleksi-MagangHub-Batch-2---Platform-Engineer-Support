@@ -3,7 +3,8 @@
 # Skenario yang direproduksi dari README:
 #   - Soal 1: 6 container "target" (campuran env staging/production) +
 #             dashboard frontend yang membaca Docker API via proxy socket.
-#   - Soal 2: 1 container sengaja rusak (restart loop, env wajib dihapus).
+#   - Soal 2: reporting-service yang sebelumnya mengalami restart loop
+#             telah diperbaiki berdasarkan hasil troubleshooting.
 #   - Soal 3: desired-state.json vs tag image yang berjalan (MISMATCH).
 #
 # Jalankan:  docker compose up -d --build
@@ -107,10 +108,10 @@ services:
     mem_limit: 256m
 
   # ---------------------------------------------------------------------
-  # Container RUSAK — Soal 2.
-  # Env var wajib (REPORTING_DB_URL) sengaja TIDAK didefinisikan di sini,
-  # sehingga proses gagal cepat (exit code 1) dan dengan restart: always
-  # akan masuk ke restart loop. Lihat logs: docker compose logs reporting-service
+  # Troubleshooting — Soal 2.
+  # Kondisi awal mengalami restart loop karena REPORTING_DB_URL tidak tersedia.
+  # Root cause telah diperbaiki dengan menyediakan environment variable
+  # yang dibutuhkan sehingga service dapat berjalan normal.
   # ---------------------------------------------------------------------
   reporting-service:
     image: alpine:3.20
