@@ -1,0 +1,162 @@
+# Lingkungan tes Platform Engineer Support — traceability
+#
+# Skenario yang direproduksi dari README:
+#   - Soal 1: 6 container "target" (campuran env staging/production) +
+#             dashboard frontend yang membaca Docker API via proxy socket.
+#   - Soal 2: 1 container sengaja rusak (restart loop, env wajib dihapus).
+#   - Soal 3: desired-state.json vs tag image yang berjalan (MISMATCH).
+#
+# Jalankan:  docker compose up -d --build
+# Dashboard: http://localhost:8080
+# Docker API (read-only): http://localhost:8080/containers/json
+
+name: pe-support-test
+
+services:
+  # ---------------------------------------------------------------------
+  # Container "target" (simulasi server target). Diamati via Docker API.
+  # ---------------------------------------------------------------------
+
+  # Subjek Soal 3: berjalan dengan tag v2.3.0, sedangkan desired-state.json
+  # mengharapkan v2.3.1 -> MISMATCH.
+  api-gateway:
+    build:
+      context: ./app
+      args:
+        APP_NAME: api-gateway
+        APP_VERSION: v2.3.0
+    image: api-gateway:v2.3.0
+    labels:
+      com.project.env: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    mem_limit: 128m
+
+  web-frontend:
+    build:
+      context: ./app
+      args:
+        APP_NAME: web-frontend
+        APP_VERSION: v1.4.2
+    image: web-frontend:v1.4.2
+    labels:
+      com.project.env: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    mem_limit: 128m
+
+  auth-service:
+    build:
+      context: ./app
+      args:
+        APP_NAME: auth-service
+        APP_VERSION: v0.9.5
+    image: auth-service:v0.9.5
+    labels:
+      com.project.env: staging
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    mem_limit: 128m
+
+  worker:
+    image: alpine:3.20
+    command:
+      ["sh", "-c", "while true; do echo 'worker processing...'; sleep 30; done"]
+    labels:
+      com.project.env: staging
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'while true' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    mem_limit: 64m
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: apppass
+      POSTGRES_DB: appdb
+    labels:
+      com.project.env: production
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  # ---------------------------------------------------------------------
+  # Container RUSAK — Soal 2.
+  # Env var wajib (REPORTING_DB_URL) sengaja TIDAK didefinisikan di sini,
+  # sehingga proses gagal cepat (exit code 1) dan dengan restart: always
+  # akan masuk ke restart loop. Lihat logs: docker compose logs reporting-service
+  # ---------------------------------------------------------------------
+  reporting-service:
+    image: alpine:3.20
+    environment:
+      REPORTING_DB_URL: "postgres://app:apppass@postgres:5432/appdb"
+    command:
+      - sh
+      - -c
+      - |
+        if [ -z "$$REPORTING_DB_URL" ]; then
+          echo "[FATAL] REPORTING_DB_URL is not set - cannot connect to reporting database" >&2
+          exit 1
+        fi
+        echo "reporting-service started"
+        exec tail -f /dev/null
+    restart: always
+    labels:
+      com.project.env: staging
+    mem_limit: 64m
+
+  # ---------------------------------------------------------------------
+  # Dashboard (Soal 1) + proxy Docker API read-only via unix socket.
+  # ---------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    mem_limit: 128m
+    depends_on:
+      - api-gateway
+      - web-frontend
+      - auth-service
+      - worker
+      - postgres
+      - reporting-service
+
+volumes:
+  pgdata:

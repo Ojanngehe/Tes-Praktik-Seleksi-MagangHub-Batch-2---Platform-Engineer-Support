@@ -1,0 +1,4 @@
+{
+  "service": "api-gateway",
+  "expected_tag": "v2.3.1"
+}
