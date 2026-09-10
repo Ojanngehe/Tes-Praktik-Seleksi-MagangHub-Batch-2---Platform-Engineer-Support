@@ -1,12 +1,11 @@
-# Platform Engineer Support — Practical Test
+# Platform Engineer Support — Tes Praktik
 
-Repository ini berisi hasil pengerjaan Tes Praktik Platform Engineer Support.
+Repository ini berisi hasil pengerjaan **Tes Praktik Seleksi MagangHub Batch 2 — Platform Engineer Support**.
 
-Problem statement asli:
-
+**Problem statement:**  
 https://github.com/suksest/plaform-engineer-support-prob
 
-Solusi mencakup tiga bagian utama:
+Solusi mencakup:
 
 1. Dashboard status container menggunakan Docker API.
 2. Investigasi dan perbaikan container yang mengalami restart loop.
@@ -14,43 +13,25 @@ Solusi mencakup tiga bagian utama:
 
 ---
 
-## Daftar Isi
+## Requirements
 
-- [Requirements](#requirements)
-- [Cara Menjalankan](#cara-menjalankan)
-- [Struktur Project](#struktur-project)
-- [Soal 1 — Dashboard Status Container](#soal-1--dashboard-status-container)
-- [Soal 2 — Investigasi Container Bermasalah](#soal-2--investigasi-container-bermasalah)
-- [Soal 3 — Cek Kesesuaian Versi Deployment](#soal-3--cek-kesesuaian-versi-deployment)
-- [Pendekatan Multi-Environment](#pendekatan-multi-environment)
-- [Asumsi](#asumsi)
-- [Batasan](#batasan)
-- [Rencana Pengembangan](#rencana-pengembangan)
-- [Validasi Akhir](#validasi-akhir)
+Pastikan environment memiliki:
 
----
-
-# Requirements
-
-Pastikan environment yang digunakan memiliki:
-
-- Docker Engine atau Docker Desktop
+- Docker Engine / Docker Desktop
 - Docker Compose
 - Git
 - Web browser
 
-Untuk memeriksa Docker dan Docker Compose:
+Verifikasi instalasi:
 
 ```bash
 docker --version
 docker compose version
 ```
 
-Project diuji menggunakan Docker Compose dan dapat dijalankan pada environment yang memiliki akses ke Docker Engine.
-
 ---
 
-# Cara Menjalankan
+## Cara Menjalankan
 
 Clone repository:
 
@@ -65,16 +46,22 @@ Build dan jalankan seluruh service:
 docker compose up -d --build
 ```
 
-Periksa status seluruh container:
+Periksa status container:
 
 ```bash
 docker compose ps
 ```
 
-Dashboard dapat diakses melalui browser:
+Dashboard dapat diakses melalui:
 
 ```text
 http://localhost:8080
+```
+
+Untuk menghentikan seluruh service:
+
+```bash
+docker compose down
 ```
 
 Port dashboard dapat diubah menggunakan environment variable `DASHBOARD_PORT`.
@@ -85,34 +72,20 @@ Contoh:
 DASHBOARD_PORT=8081 docker compose up -d
 ```
 
-Untuk menghentikan seluruh environment:
-
-```bash
-docker compose down
-```
-
-Untuk menghapus environment sekaligus volume:
-
-```bash
-docker compose down -v
-```
-
 ---
 
-# Struktur Project
+## Struktur Repository
 
 ```text
 .
 ├── app/
 │   ├── Dockerfile
 │   └── index.html
-│
 ├── dashboard/
 │   ├── Dockerfile
 │   ├── app.js
 │   ├── index.html
 │   └── nginx.conf
-│
 ├── .env.example
 ├── .gitignore
 ├── desired-state.json
@@ -120,81 +93,51 @@ docker compose down -v
 └── README.md
 ```
 
-Keterangan:
-
-- `app/` digunakan untuk membuat service simulasi seperti `api-gateway`, `web-frontend`, dan `auth-service`.
-- `dashboard/` berisi frontend dashboard serta konfigurasi Nginx.
-- `desired-state.json` menyimpan target versi deployment untuk proses pengecekan versi.
-- `docker-compose.yml` mendefinisikan seluruh service dan environment pengujian.
+- `app/` berisi image sederhana untuk service simulasi.
+- `dashboard/` berisi frontend dashboard dan konfigurasi Nginx.
+- `desired-state.json` menyimpan target versi deployment.
+- `docker-compose.yml` mendefinisikan seluruh service untuk environment pengujian.
 
 ---
 
 # Soal 1 — Dashboard Status Container
 
-## Tujuan
-
-Membuat dashboard yang mengambil informasi container dari Docker API dan menampilkan:
-
-- Nama container
-- Image dan tag
-- Status container
-- Environment
-- Container ID
-- Informasi waktu pembuatan container
-
-Container juga dikelompokkan berdasarkan environment.
-
----
-
 ## Pendekatan
 
-Dashboard mengambil data container melalui Docker API menggunakan endpoint:
+Dashboard mengambil data container dari Docker API menggunakan:
 
 ```text
 GET /containers/json?all=1
 ```
 
-Query parameter:
+Parameter `all=1` digunakan agar container dengan kondisi selain running, seperti `exited`, tetap dapat dideteksi.
 
-```text
-all=1
-```
-
-digunakan agar dashboard tidak hanya melihat container yang sedang berjalan, tetapi juga dapat membaca container dengan kondisi seperti `exited` jika tersedia.
-
-Request dari frontend diteruskan melalui Nginx ke Docker Engine menggunakan Unix socket:
+Frontend tidak mengakses Docker socket secara langsung. Request diteruskan oleh Nginx ke Docker Engine melalui:
 
 ```text
 /var/run/docker.sock
 ```
 
-Frontend menggunakan same-origin request sehingga tidak perlu mengekspos Docker API melalui port TCP tambahan.
+Dengan pendekatan ini, frontend dapat menggunakan request same-origin tanpa mengekspos Docker API melalui TCP port tambahan.
 
----
+## Informasi yang Ditampilkan
 
-## Environment
+Setiap container menampilkan:
 
-Environment container ditentukan menggunakan Docker label:
+- Nama container
+- Image dan tag
+- Status
+- Environment
+- Container ID
+- Waktu pembuatan container
+
+Environment diambil dari label:
 
 ```text
 com.project.env
 ```
 
-Contoh:
-
-```text
-com.project.env=production
-```
-
-atau:
-
-```text
-com.project.env=staging
-```
-
-Container kemudian dikelompokkan berdasarkan environment.
-
-Environment yang digunakan pada project ini meliputi:
+Container kemudian dikelompokkan berdasarkan:
 
 ```text
 production
@@ -202,75 +145,29 @@ staging
 unknown
 ```
 
-Jika suatu container tidak memiliki label:
+Container tanpa label environment ditempatkan pada kelompok `unknown`.
 
-```text
-com.project.env
-```
+## Penanganan Image Digest
 
-container tersebut dimasukkan ke kelompok:
-
-```text
-unknown
-```
-
-Environment juga ditampilkan secara eksplisit pada masing-masing container card.
-
----
-
-## Status Container
-
-Status container ditampilkan langsung pada dashboard.
-
-Beberapa kondisi yang dianggap bermasalah adalah:
-
-```text
-restarting
-exited
-dead
-```
-
-Container yang berada pada kondisi tersebut diberikan penanda visual agar lebih mudah ditemukan.
-
-Dashboard juga menampilkan ringkasan jumlah container dan jumlah container yang sedang bermasalah.
-
-Contoh:
-
-```text
-7 container · 0 bermasalah
-```
-
----
-
-## Image dan Tag
-
-Pada beberapa kondisi, endpoint:
-
-```text
-GET /containers/json
-```
-
-dapat menampilkan nilai image sebagai digest:
+Pada beberapa kondisi, Docker API dapat mengembalikan image sebagai digest:
 
 ```text
 sha256:...
 ```
 
-Hal tersebut kurang informatif untuk kebutuhan dashboard karena image name dan tag tidak terlihat.
-
-Untuk menangani kondisi tersebut, dashboard melakukan Docker Inspect menggunakan endpoint:
+Jika hal tersebut terjadi, dashboard melakukan Docker Inspect:
 
 ```text
 GET /containers/{id}/json
 ```
 
-dan mengambil configured image dari:
+dan menggunakan:
 
 ```text
 Config.Image
 ```
 
-Dengan pendekatan ini, dashboard dapat menampilkan image seperti:
+agar image tetap ditampilkan dalam format yang mudah dibaca, misalnya:
 
 ```text
 api-gateway:v2.3.0
@@ -279,73 +176,38 @@ auth-service:v0.9.5
 postgres:16-alpine
 ```
 
-Jika `/containers/json` sudah memberikan image name dan tag, nilai tersebut dapat digunakan langsung.
+## Status dan UI
 
----
-
-## Auto Refresh
-
-Dashboard melakukan refresh otomatis setiap:
+Container dengan state berikut ditandai sebagai bermasalah:
 
 ```text
-5 detik
+restarting
+exited
+dead
 ```
 
-Selain itu tersedia tombol:
+Dashboard juga menampilkan jumlah container serta jumlah container bermasalah.
 
-```text
-Muat Ulang
-```
+Data diperbarui otomatis setiap 5 detik dan dapat diperbarui manual melalui tombol **Muat Ulang**.
 
-untuk melakukan refresh secara manual.
-
----
-
-## UI
-
-Sebagai bagian bonus, dashboard menggunakan tampilan dark UI dengan:
-
-- Card per container
-- Badge environment
-- Badge status
-- Highlight untuk container bermasalah
-- Responsive grid
-- Deployment Version Check panel
-
-Tujuan perubahan UI adalah membuat informasi operasional lebih mudah dibaca dan container bermasalah lebih cepat ditemukan.
-
----
+Sebagai bonus, UI dibuat menggunakan card, badge status, badge environment, responsive grid, dan visual warning untuk mempermudah identifikasi masalah.
 
 ## Dashboard Healthcheck
 
-Pada pengujian awal, dashboard dapat diakses normal dari browser tetapi container berstatus:
+Pada pengujian awal, dashboard dapat diakses melalui browser tetapi healthcheck Docker berstatus `unhealthy`.
+
+Request dari dalam container ke:
 
 ```text
-unhealthy
+http://localhost/
 ```
 
-Investigasi dari dalam container menggunakan:
+ter-resolve ke IPv6 `::1` dan menghasilkan `Connection refused`.
 
-```bash
-docker compose exec dashboard wget -S -O - http://localhost/
-```
-
-menghasilkan koneksi ke:
+Sementara:
 
 ```text
-::1
-```
-
-dan gagal dengan:
-
-```text
-Connection refused
-```
-
-Sedangkan request ke:
-
-```bash
-docker compose exec dashboard wget -S -O - http://127.0.0.1/
+http://127.0.0.1/
 ```
 
 menghasilkan:
@@ -354,50 +216,40 @@ menghasilkan:
 HTTP/1.1 200 OK
 ```
 
-Hal ini terjadi karena `localhost` pada container ter-resolve ke IPv6, sedangkan endpoint Nginx dapat diakses melalui IPv4.
-
-Healthcheck kemudian menggunakan:
+Healthcheck kemudian disesuaikan menjadi:
 
 ```yaml
 healthcheck:
   test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
 ```
 
-Setelah perubahan, status dashboard menjadi:
-
-```text
-healthy
-```
+Setelah perubahan, container dashboard berada pada kondisi `healthy`.
 
 ---
 
 # Soal 2 — Investigasi Container Bermasalah
 
-## Kondisi Awal
+## Deteksi Masalah
 
-Container yang terdeteksi bermasalah adalah:
+Container yang mengalami restart loop adalah:
 
 ```text
 reporting-service
 ```
 
-Pemeriksaan menggunakan:
+Pemeriksaan dilakukan menggunakan:
 
 ```bash
 docker compose ps
 ```
 
-menunjukkan status:
+Kondisi awal menunjukkan:
 
 ```text
 Restarting (1)
 ```
 
-Hal ini menunjukkan bahwa proses utama container terus berhenti dan Docker mencoba menjalankannya kembali.
-
----
-
-## Investigasi Logs
+## Investigasi
 
 Logs diperiksa menggunakan:
 
@@ -405,31 +257,13 @@ Logs diperiksa menggunakan:
 docker compose logs --tail=20 reporting-service
 ```
 
-Pesan error yang ditemukan:
+Ditemukan error:
 
 ```text
 [FATAL] REPORTING_DB_URL is not set - cannot connect to reporting database
 ```
 
-Pesan tersebut menunjukkan bahwa startup `reporting-service` membutuhkan environment variable:
-
-```text
-REPORTING_DB_URL
-```
-
-tetapi variable tersebut belum tersedia.
-
----
-
-## Investigasi Docker Inspect
-
-State container diperiksa menggunakan:
-
-```bash
-docker inspect pe-support-test-reporting-service-1
-```
-
-Untuk mendapatkan informasi yang lebih ringkas digunakan:
+State container kemudian diperiksa menggunakan:
 
 ```bash
 docker inspect pe-support-test-reporting-service-1 --format='ExitCode={{.State.ExitCode}} Status={{.State.Status}} Restarting={{.State.Restarting}} Error={{.State.Error}}'
@@ -443,61 +277,37 @@ Status=restarting
 Restarting=true
 ```
 
-Environment variable container juga diperiksa menggunakan:
+Environment variable juga diperiksa menggunakan:
 
 ```bash
 docker inspect pe-support-test-reporting-service-1 --format='{{range .Config.Env}}{{println .}}{{end}}'
 ```
 
-Pada kondisi awal, output tidak memiliki:
-
-```text
-REPORTING_DB_URL
-```
-
----
+Pada kondisi awal tidak terdapat `REPORTING_DB_URL`.
 
 ## Root Cause
 
-`reporting-service` memiliki startup command yang memeriksa keberadaan:
+`reporting-service` membutuhkan environment variable:
 
 ```text
 REPORTING_DB_URL
 ```
 
-Jika variable tersebut kosong, proses mengeluarkan pesan:
+Startup process menghentikan service dengan `exit code 1` ketika variable tersebut tidak tersedia.
 
-```text
-[FATAL] REPORTING_DB_URL is not set - cannot connect to reporting database
-```
-
-kemudian berhenti dengan:
-
-```text
-exit code 1
-```
-
-Container juga menggunakan restart policy:
+Karena container menggunakan:
 
 ```yaml
 restart: always
 ```
 
-Akibatnya proses yang gagal terus dijalankan kembali oleh Docker dan menghasilkan restart loop.
+Docker terus menjalankan kembali process yang gagal sehingga terjadi restart loop.
 
-Dengan demikian, melakukan:
-
-```text
-docker restart
-```
-
-saja tidak menyelesaikan masalah karena tidak memperbaiki root cause.
-
----
+Dengan demikian, hanya melakukan restart container tidak menyelesaikan root cause.
 
 ## Perbaikan
 
-Konfigurasi PostgreSQL pada environment menggunakan:
+Konfigurasi PostgreSQL yang tersedia adalah:
 
 ```text
 Host     : postgres
@@ -513,44 +323,38 @@ Connection string yang digunakan:
 postgres://app:apppass@postgres:5432/appdb
 ```
 
-Kemudian `REPORTING_DB_URL` ditambahkan pada `reporting-service`:
+Kemudian ditambahkan ke konfigurasi `reporting-service`:
 
 ```yaml
 environment:
   REPORTING_DB_URL: "postgres://app:apppass@postgres:5432/appdb"
 ```
 
-Container kemudian dibuat ulang:
+Container dibuat ulang:
 
 ```bash
 docker compose up -d --force-recreate reporting-service
 ```
 
-Logs diperiksa kembali:
+Verifikasi logs:
 
 ```bash
 docker compose logs --tail=10 reporting-service
 ```
 
-Hasil setelah perbaikan:
+Hasil:
 
 ```text
 reporting-service started
 ```
 
-Status container:
-
-```bash
-docker compose ps reporting-service
-```
-
-berubah menjadi:
+Status container setelah perbaikan:
 
 ```text
 Up
 ```
 
-Dengan demikian, restart loop berhasil diselesaikan dengan memperbaiki konfigurasi environment variable yang menjadi root cause.
+Dengan demikian, restart loop berhasil diperbaiki dengan menangani root cause pada konfigurasi environment variable.
 
 ---
 
@@ -558,13 +362,13 @@ Dengan demikian, restart loop berhasil diselesaikan dengan memperbaiki konfigura
 
 ## Desired State
 
-Target deployment disimpan pada:
+Target versi disimpan pada:
 
 ```text
 desired-state.json
 ```
 
-Isi default:
+Isi:
 
 ```json
 {
@@ -573,80 +377,35 @@ Isi default:
 }
 ```
 
-Sementara deployment aktual menggunakan image:
+Deployment aktual menggunakan:
 
 ```text
 api-gateway:v2.3.0
 ```
 
----
-
 ## Pendekatan
 
-Dashboard melakukan proses:
+Version checker melakukan proses berikut:
 
 1. Membaca `service` dan `expected_tag` dari `desired-state.json`.
 2. Mengambil daftar container melalui Docker API.
-3. Mencari container berdasarkan nama service.
-4. Memastikan container target sedang berjalan.
-5. Mengambil configured image container.
-6. Mengekstrak image tag aktual.
-7. Membandingkan actual tag dengan expected tag.
-8. Menampilkan hasil pada dashboard.
+3. Mencari container berdasarkan label `com.docker.compose.service`.
+4. Menggunakan nama container sebagai fallback.
+5. Memastikan service berada pada state `running`.
+6. Mengambil image aktual.
+7. Mengekstrak image tag.
+8. Membandingkan actual tag dengan expected tag.
+9. Menampilkan hasil pada dashboard.
 
-Untuk mengidentifikasi service Docker Compose digunakan label:
-
-```text
-com.docker.compose.service
-```
-
-Jika label tidak tersedia, nama container digunakan sebagai fallback.
-
----
-
-## Mengambil Image Aktual
-
-Image aktual diperoleh melalui Docker API.
-
-Jika informasi image dari:
-
-```text
-GET /containers/json
-```
-
-tidak cukup dan hanya menghasilkan digest, digunakan Docker Inspect:
-
-```text
-GET /containers/{id}/json
-```
-
-Kemudian image diambil dari:
+Jika Docker API hanya memberikan digest image, informasi image diambil melalui Docker Inspect dari:
 
 ```text
 Config.Image
 ```
 
-Contoh:
-
-```text
-api-gateway:v2.3.0
-```
-
-Tag kemudian diekstrak menjadi:
-
-```text
-v2.3.0
-```
-
----
-
-## Status Deployment
-
-Terdapat tiga status yang dapat ditampilkan.
+## Status yang Didukung
 
 ### MATCH
-
-Jika actual tag sama dengan expected tag:
 
 ```text
 Expected : v2.3.0
@@ -654,11 +413,9 @@ Actual   : v2.3.0
 Status   : MATCH
 ```
 
----
-
 ### MISMATCH
 
-Jika service berjalan tetapi version tag berbeda:
+Kondisi default project:
 
 ```text
 Expected : v2.3.1
@@ -666,19 +423,9 @@ Actual   : v2.3.0
 Status   : MISMATCH
 ```
 
-Ini merupakan kondisi default pada problem statement.
-
----
-
 ### SERVICE NOT RUNNING
 
-Jika service target tidak ditemukan atau tidak berada pada state:
-
-```text
-running
-```
-
-maka dashboard menampilkan:
+Jika service tidak ditemukan atau tidak sedang running:
 
 ```text
 Expected : v2.3.1
@@ -686,70 +433,19 @@ Actual   : -
 Status   : SERVICE NOT RUNNING
 ```
 
----
-
-## Pengujian SERVICE NOT RUNNING
-
-Kondisi ini dapat direproduksi menggunakan:
+Kondisi tersebut dapat diuji dengan:
 
 ```bash
 docker compose stop api-gateway
 ```
 
-Dashboard kemudian mendeteksi bahwa service tidak sedang berjalan.
-
-Untuk menghidupkannya kembali:
+Kemudian service dapat dijalankan kembali:
 
 ```bash
 docker compose start api-gateway
 ```
 
----
-
-## Pengujian MATCH
-
-Untuk menguji kondisi `MATCH`, `desired-state.json` dapat sementara diubah menjadi:
-
-```json
-{
-  "service": "api-gateway",
-  "expected_tag": "v2.3.0"
-}
-```
-
-Kemudian rebuild dashboard:
-
-```bash
-docker compose build dashboard
-docker compose up -d --force-recreate dashboard
-```
-
-Expected dan actual version menjadi:
-
-```text
-Expected : v2.3.0
-Actual   : v2.3.0
-Status   : MATCH
-```
-
-Setelah pengujian, `desired-state.json` dikembalikan ke kondisi problem statement:
-
-```json
-{
-  "service": "api-gateway",
-  "expected_tag": "v2.3.1"
-}
-```
-
-Sehingga kondisi akhir kembali menjadi:
-
-```text
-Expected : v2.3.1
-Actual   : v2.3.0
-Status   : MISMATCH
-```
-
-Status `MISMATCH` pada kondisi akhir bukan merupakan error pada aplikasi, tetapi menunjukkan bahwa version checker berhasil mendeteksi perbedaan antara desired state dan deployment aktual.
+Status `MISMATCH` pada kondisi akhir bukan merupakan error aplikasi. Status tersebut menunjukkan bahwa version checker berhasil mendeteksi perbedaan antara desired state dan deployment aktual.
 
 ---
 
@@ -757,7 +453,7 @@ Status `MISMATCH` pada kondisi akhir bukan merupakan error pada aplikasi, tetapi
 
 Implementasi saat ini menggunakan satu Docker Engine.
 
-Untuk penggunaan pada banyak environment seperti:
+Jika solusi dikembangkan untuk banyak environment seperti:
 
 ```text
 development
@@ -765,11 +461,9 @@ staging
 production
 ```
 
-pendekatan yang digunakan perlu diubah karena dashboard tidak sebaiknya terhubung langsung ke Docker socket pada setiap server.
+dashboard sebaiknya tidak mengakses Docker socket dari setiap server secara langsung.
 
-Pendekatan yang dapat digunakan adalah menyediakan collector atau agent pada setiap environment.
-
-Contoh arsitektur:
+Pendekatan yang lebih sesuai adalah menggunakan collector atau agent pada masing-masing environment:
 
 ```text
 Docker Engine / Container Platform
@@ -787,227 +481,77 @@ Docker Engine / Container Platform
            Dashboard
 ```
 
-Collector bertugas mengambil informasi seperti:
+Collector mengambil informasi seperti:
 
-```text
-environment
-service
-image
-tag
-container status
-timestamp
-```
+- Environment
+- Service
+- Image
+- Tag
+- Container status
+- Timestamp
 
-dari masing-masing environment.
+Data kemudian dikirim ke central service.
 
-Informasi tersebut kemudian dikirimkan ke central service.
+Version check juga sebaiknya dipindahkan dari frontend menjadi **scheduled job** atau background process sehingga pengecekan tetap berjalan tanpa bergantung pada dashboard yang sedang dibuka.
 
-Pengecekan versi juga sebaiknya dipindahkan dari frontend menjadi scheduled job atau background service.
+Pendekatan tersebut dapat dikembangkan untuk mendukung:
 
-Contoh proses:
-
-```text
-Read Desired State
-        |
-        v
-Read Actual Deployment
-        |
-        v
-Compare Version
-        |
-        v
-Store Result
-        |
-        v
-MATCH / MISMATCH / SERVICE NOT RUNNING
-```
-
-Dengan pendekatan tersebut, pengecekan tidak bergantung pada browser yang sedang membuka dashboard.
-
-Pendekatan ini juga lebih mudah dikembangkan untuk:
-
-- Banyak server
+- Banyak host
 - Banyak environment
 - Banyak service
 - Deployment history
-- Alert dan notification
+- Alerting
 - CI/CD integration
 - Artifact Registry
 - Audit trail
 - Scheduled reconciliation
-- Role-based access
 
 ---
 
 # Asumsi
 
-Beberapa asumsi yang digunakan dalam pengerjaan:
+Beberapa asumsi yang digunakan:
 
-1. Docker Engine dapat diakses oleh container dashboard melalui:
-
-   ```text
-   /var/run/docker.sock
-   ```
-
-2. Environment container ditentukan melalui label:
-
-   ```text
-   com.project.env
-   ```
-
-3. Container tanpa label environment dikategorikan sebagai:
-
-   ```text
-   unknown
-   ```
-
+1. Docker Engine dapat diakses melalui `/var/run/docker.sock`.
+2. Environment container ditentukan dari label `com.project.env`.
+3. Container tanpa label environment dikategorikan sebagai `unknown`.
 4. `expected_tag` pada `desired-state.json` merupakan Docker image tag.
-
-5. Service target pada implementasi saat ini berjalan pada Docker Engine yang sama dengan dashboard.
-
-6. Label:
-
-   ```text
-   com.docker.compose.service
-   ```
-
-   digunakan untuk mencocokkan service dengan container.
-
+5. Service target berada pada Docker Engine yang sama dengan dashboard.
+6. Label `com.docker.compose.service` digunakan sebagai identifikasi utama service.
 7. Nama container digunakan sebagai fallback jika label service tidak tersedia.
-
-8. `desired-state.json` pada implementasi saat ini berisi satu service target.
+8. `desired-state.json` saat ini berisi satu service target.
 
 ---
 
 # Batasan
 
-Implementasi saat ini memiliki beberapa batasan.
+Implementasi saat ini memiliki beberapa batasan:
 
-### Single Docker Engine
+- Hanya membaca satu Docker Engine.
+- Belum menyimpan deployment history.
+- `desired-state.json` hanya menangani satu service.
+- Belum memiliki alert otomatis untuk `MISMATCH` atau `SERVICE NOT RUNNING`.
+- Belum memiliki authentication dan authorization.
+- Dashboard masih menggunakan Docker socket lokal sebagai sumber data.
 
-Dashboard saat ini membaca satu Docker Engine melalui:
-
-```text
-/var/run/docker.sock
-```
-
-Sehingga belum secara langsung mendukung banyak host atau banyak Docker Engine.
-
-### Tidak Ada Deployment History
-
-Status container dan version check yang ditampilkan merupakan kondisi terkini.
-
-Belum terdapat persistent storage untuk menyimpan history deployment.
-
-### Satu Desired Service
-
-`desired-state.json` saat ini hanya menangani satu service target.
-
-### Tidak Ada Alert Otomatis
-
-Kondisi:
-
-```text
-MISMATCH
-```
-
-atau:
-
-```text
-SERVICE NOT RUNNING
-```
-
-hanya ditampilkan pada dashboard dan belum menghasilkan notification.
-
-### Tidak Ada Authentication
-
-Dashboard digunakan sebagai environment tes lokal sehingga belum memiliki authentication dan authorization.
-
-### Docker Socket Access
-
-Docker socket memberikan akses yang sensitif terhadap Docker Engine.
-
-Pendekatan ini sesuai untuk environment tes, tetapi untuk production sebaiknya frontend tidak diberikan akses langsung ke Docker socket.
+Akses ke Docker socket memiliki privilege yang tinggi. Untuk penggunaan production, sebaiknya digunakan backend atau collector dengan permission yang lebih terbatas.
 
 ---
 
 # Rencana Pengembangan
 
-Jika solusi dikembangkan lebih lanjut untuk production, beberapa peningkatan yang dapat dilakukan adalah:
+Jika solusi dikembangkan lebih lanjut:
 
-### 1. Backend atau Collector Service
+1. Mengganti akses langsung ke Docker socket dengan backend/collector service.
+2. Menambahkan dukungan multi-host dan multi-environment.
+3. Menambahkan database untuk menyimpan deployment history.
+4. Mendukung desired state untuk banyak service.
+5. Menjalankan version check melalui scheduled job.
+6. Menambahkan alert untuk mismatch atau service yang tidak berjalan.
+7. Menambahkan authentication dan role-based access.
+8. Mengintegrasikan deployment status dengan CI/CD dan Artifact Registry.
 
-Mengganti akses langsung dashboard terhadap Docker socket dengan backend atau collector yang memiliki permission terbatas.
-
-Dashboard hanya berkomunikasi dengan API dari backend tersebut.
-
-### 2. Multi-Environment Support
-
-Menambahkan collector untuk setiap environment:
-
-```text
-development
-staging
-production
-```
-
-Data dari setiap environment dikirim menuju central service.
-
-### 3. Persistent Storage
-
-Menambahkan database untuk menyimpan:
-
-- Status container
-- Deployment version
-- Environment
-- Timestamp
-- History perubahan deployment
-
-### 4. Multiple Desired States
-
-Mengembangkan format desired state agar dapat menangani banyak service.
-
-Contoh:
-
-```json
-{
-  "services": [
-    {
-      "service": "api-gateway",
-      "expected_tag": "v2.3.1"
-    },
-    {
-      "service": "web-frontend",
-      "expected_tag": "v1.4.2"
-    }
-  ]
-}
-```
-
-### 5. Scheduled Version Check
-
-Memindahkan version check dari browser menjadi scheduled job atau background process.
-
-Dengan demikian, pengecekan tetap berjalan meskipun dashboard tidak sedang dibuka.
-
-### 6. Alerting
-
-Menambahkan notification ketika ditemukan:
-
-```text
-MISMATCH
-SERVICE NOT RUNNING
-```
-
-Notification dapat dikirim melalui channel seperti email atau platform komunikasi internal.
-
-### 7. Authentication dan Authorization
-
-Menambahkan authentication dan role-based access apabila dashboard digunakan pada environment production.
-
-### 8. CI/CD dan Artifact Registry Integration
-
-Deployment version dapat dihubungkan dengan pipeline CI/CD dan Artifact Registry sehingga traceability dapat dilakukan dari:
+Dengan pengembangan tersebut, traceability dapat diperluas menjadi:
 
 ```text
 Task Management
@@ -1023,19 +567,17 @@ Artifact Registry
 Deployment
 ```
 
-Dengan pendekatan ini, versi yang sedang berjalan dapat dilacak kembali hingga source code dan proses build yang menghasilkan artifact tersebut.
-
 ---
 
-# Validasi Akhir
+# Validasi
 
-Validasi konfigurasi Docker Compose:
+Validasi Docker Compose:
 
 ```bash
 docker compose config
 ```
 
-Build dan jalankan seluruh environment:
+Build dan jalankan environment:
 
 ```bash
 docker compose up -d --build
@@ -1047,31 +589,25 @@ Periksa seluruh container:
 docker compose ps
 ```
 
-Periksa reporting service:
-
-```bash
-docker compose ps reporting-service
-```
-
-Periksa logs reporting service:
+Periksa `reporting-service`:
 
 ```bash
 docker compose logs --tail=10 reporting-service
 ```
 
-Expected log setelah perbaikan:
+Expected:
 
 ```text
 reporting-service started
 ```
 
-Periksa dashboard:
+Buka dashboard:
 
 ```text
 http://localhost:8080
 ```
 
-Pada kondisi akhir, version check menunjukkan:
+Kondisi akhir version check:
 
 ```text
 Service  : api-gateway
@@ -1080,72 +616,28 @@ Actual   : v2.3.0
 Status   : MISMATCH
 ```
 
-`reporting-service` berada pada status:
-
-```text
-Up
-```
-
-dan dashboard berada pada kondisi:
-
-```text
-healthy
-```
+`reporting-service` berada pada kondisi `Up` dan dashboard berada pada kondisi `healthy`.
 
 ---
 
-# Ringkasan Hasil
+# Ringkasan
 
-## Soal 1
+| Soal                             | Hasil      |
+| -------------------------------- | ---------- |
+| Dashboard Status Container       | Selesai    |
+| Grouping berdasarkan environment | Selesai    |
+| Image + tag                      | Selesai    |
+| UI improvement                   | Selesai    |
+| Investigasi restart loop         | Selesai    |
+| Root cause analysis              | Selesai    |
+| Perbaikan `reporting-service`    | Selesai    |
+| Deployment version check         | Selesai    |
+| MATCH                            | Didukung   |
+| MISMATCH                         | Didukung   |
+| SERVICE NOT RUNNING              | Didukung   |
+| Multi-environment approach       | Dijelaskan |
 
-Dashboard berhasil:
-
-- Mengambil data container dari Docker API
-- Menampilkan nama container
-- Menampilkan image dan tag
-- Menampilkan status
-- Menampilkan environment
-- Mengelompokkan container berdasarkan environment
-- Mendeteksi container bermasalah
-- Melakukan auto-refresh
-- Menyediakan UI yang lebih nyaman digunakan
-
-## Soal 2
-
-`reporting-service` berhasil diinvestigasi.
-
-Root cause ditemukan berupa:
-
-```text
-REPORTING_DB_URL tidak tersedia
-```
-
-Container berhenti dengan:
-
-```text
-ExitCode=1
-```
-
-dan restart policy menyebabkan restart loop.
-
-Masalah diperbaiki dengan memberikan connection string yang diperlukan sehingga container kembali berada pada status:
-
-```text
-Up
-```
-
-## Soal 3
-
-Deployment Version Check berhasil:
-
-- Membaca `desired-state.json`
-- Mengambil versi aktual melalui Docker API
-- Membandingkan expected dan actual tag
-- Menghasilkan status `MATCH`
-- Menghasilkan status `MISMATCH`
-- Menghasilkan status `SERVICE NOT RUNNING`
-
-Kondisi akhir:
+Kondisi akhir deployment:
 
 ```text
 api-gateway

@@ -71,6 +71,10 @@ function renderCard(c) {
 
   const shortId = (c.Id || "").slice(0, 12);
 
+  const created = c.Created
+    ? new Date(c.Created * 1000).toLocaleString("id-ID")
+    : "n/a";
+
   const broken = BROKEN_STATES.some((s) => status.includes(s));
 
   return `
@@ -97,7 +101,7 @@ function renderCard(c) {
 
       <div class="row">
         <span class="label">Created</span>
-        <span class="value">${escapeHtml(c.CreatedAt || "n/a")}</span>
+        <span class="value">${escapeHtml(created)}</span>
       </div>
     </div>
   `;
